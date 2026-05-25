@@ -1,15 +1,14 @@
-package com.fitnesscenter.app.entity;
+package com.fitnesscenter.app.dto.response;
 
+
+import lombok.Builder;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-import jakarta.persistence.*;
 import java.time.LocalDate;
 
 @Data
-@EqualsAndHashCode(callSuper = true)
-@Entity
-@Table(name = "torepair")
-public class TORepair extends BaseEntity {
+@Builder
+public class TORepairRs {
+    private Long id;
     private String status;
     private String description;
     private String worker;

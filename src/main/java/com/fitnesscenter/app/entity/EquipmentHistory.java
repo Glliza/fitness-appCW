@@ -8,14 +8,16 @@ import java.time.LocalDate;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "inventarization")
-public class Inventarization extends BaseEntity {
+@Table(name = "equipment_history")
+public class EquipmentHistory extends BaseEntity {
 
-    private Long equipmentInventoryNumber;
+    private String equipmentHistoryNumber;
 
-    private Integer count;
-
-    private Integer realCount;
+    private String type;
 
     private LocalDate date;  // это поле НЕ в BaseEntity, оставляем
+
+    private String worker;
+
+    private String description;
 }

@@ -1,17 +1,17 @@
-package com.fitnesscenter.app.entity;
+package com.fitnesscenter.app.dto.response;
 
+
+import lombok.Builder;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Data
-@EqualsAndHashCode(callSuper = true)
-@Entity
-@Table(name = "request_repair")
-public class RequestRepair extends BaseEntity {
+@Builder
+public class RequestRepairRs {
+    private Long id;
     private Long TORepairId;
     private Long equipmentInventoryNumber;
+    private LocalDateTime created_at;
     private String status;
     private String worker;
     private String description;
