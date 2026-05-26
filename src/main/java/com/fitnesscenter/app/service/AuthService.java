@@ -33,6 +33,7 @@ public class AuthService {
                 .login(admin.getLogin())
                 .fio(admin.getFio())
                 .email(admin.getEmail())
+                .token(token)
                 .build();
     }
 

@@ -10,14 +10,11 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "equipment")
 public class Equipment extends BaseEntity {
-    @Column(unique = true, nullable = false)
-    private Long id;
 
     @Column(name = "zone_id")
     private Long zoneId;
 
     private String name;
-
     private String status;
 
     @Column(name = "data_buy")

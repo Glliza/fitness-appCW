@@ -35,18 +35,46 @@ public class EquipmentService {
 
     @Transactional
     public EquipmentRs createEquipment(EquipmentRq request) {
+        System.out.println("=== СОЗДАНИЕ ОБОРУДОВАНИЯ ===");
+        System.out.println("zoneId: " + request.getZoneId());
+        System.out.println("name: " + request.getName());
+
+        // Проверяем вместимость зоны
+        checkZoneCapacity(request.getZoneId());
+
         Zone zone = zoneRepository.findByIdAndDeletedFalse(request.getZoneId())
                 .orElseThrow(() -> new EntityNotFoundException("Zone", request.getZoneId()));
 
         Equipment equipment = new Equipment();
-
         equipment.setZoneId(request.getZoneId());
         equipment.setName(request.getName());
-        equipment.setStatus("Новое");
+        equipment.setStatus(request.getStatus() != null ? request.getStatus() : "Новое");
         equipment.setDataBuy(request.getDataBuy());
 
         Equipment saved = equipmentRepository.save(equipment);
+        System.out.println("Сохранённое оборудование - ID: " + saved.getId());
         return mapToRs(saved);
+    }
+
+    @Transactional
+    public EquipmentRs updateEquipment(Long id, EquipmentRq request) {
+        Equipment equipment = equipmentRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new EntityNotFoundException("Equipment", id));
+
+        Long oldZoneId = equipment.getZoneId();
+        Long newZoneId = request.getZoneId();
+
+        // Если зона меняется, проверяем вместимость новой зоны
+        if (newZoneId != null && !newZoneId.equals(oldZoneId)) {
+            checkZoneCapacity(newZoneId);
+            equipment.setZoneId(newZoneId);
+        }
+
+        equipment.setName(request.getName());
+        equipment.setStatus(request.getStatus());
+        equipment.setDataBuy(request.getDataBuy());
+
+        return mapToRs(equipmentRepository.save(equipment));
     }
 
     @Transactional
@@ -80,16 +108,33 @@ public class EquipmentService {
     }
 
     private EquipmentRs mapToRs(Equipment equipment) {
-        String zoneName = zoneRepository.findByIdAndDeletedFalse(equipment.getZoneId())
-                .map(Zone::getName)
-                .orElse("");
+        String zoneName = "";
+        if (equipment.getZoneId() != null) {
+            zoneName = zoneRepository.findByIdAndDeletedFalse(equipment.getZoneId())
+                    .map(Zone::getName)
+                    .orElse("");
+        }
 
         return EquipmentRs.builder()
                 .id(equipment.getId())
+                .zoneId(equipment.getZoneId())
                 .zoneName(zoneName)
                 .name(equipment.getName())
                 .status(equipment.getStatus())
                 .dataBuy(equipment.getDataBuy())
                 .build();
+    }
+
+    private void checkZoneCapacity(Long zoneId) {
+        Zone zone = zoneRepository.findByIdAndDeletedFalse(zoneId)
+                .orElseThrow(() -> new EntityNotFoundException("Zone", zoneId));
+
+        Integer currentEquipmentCount = equipmentRepository.countByZoneIdAndDeletedFalse(zoneId);
+
+        if (currentEquipmentCount >= zone.getCapacity()) {
+            throw new RuntimeException("Невозможно добавить оборудование. Зона '" + zone.getName() +
+                    "' имеет вместимость " + zone.getCapacity() +
+                    " единиц оборудования. Уже занято: " + currentEquipmentCount);
+        }
     }
 }

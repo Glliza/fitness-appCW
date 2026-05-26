@@ -50,4 +50,9 @@ public class EquipmentController {
     public ResponseEntity<List<EquipmentRs>> getByStatus(@PathVariable String status) {
         return ResponseEntity.ok(equipmentService.getByStatus(status));
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<EquipmentRs> update(@PathVariable Long id, @RequestBody EquipmentRq request) {
+        return ResponseEntity.ok(equipmentService.updateEquipment(id, request));
+    }
 }

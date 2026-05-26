@@ -1,6 +1,5 @@
 package com.fitnesscenter.app.dto.response;
 
-
 import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDate;
@@ -9,6 +8,7 @@ import java.time.LocalDate;
 @Builder
 public class EquipmentRs {
     private Long id;
+    private Long zoneId;        // ДОБАВЬТЕ ЭТО ПОЛЕ
     private String zoneName;
     private String name;
     private String status;

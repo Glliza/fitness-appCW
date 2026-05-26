@@ -10,4 +10,5 @@ public class AdminRs {
     private String login;
     private String fio;
     private String email;
+    private String token;
 }
