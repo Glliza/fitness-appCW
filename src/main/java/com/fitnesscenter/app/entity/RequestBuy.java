@@ -13,4 +13,5 @@ public class RequestBuy extends BaseEntity {
     private Long equipmentInventoryNumber;
     private String name;
     private Integer count;
+    private String status;
 }

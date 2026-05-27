@@ -1,6 +1,7 @@
 package com.fitnesscenter.app.service;
 
 import com.fitnesscenter.app.dto.request.RequestBuyRq;
+import com.fitnesscenter.app.dto.request.UpdateRequestBuyStatusRq;
 import com.fitnesscenter.app.dto.response.RequestBuyRs;
 import com.fitnesscenter.app.entity.RequestBuy;
 import com.fitnesscenter.app.repository.RequestBuyRepository;
@@ -22,7 +23,7 @@ public class RequestBuyService {
         buy.setEquipmentInventoryNumber(request.getEquipmentInventoryNumber());
         buy.setName(request.getName());
         buy.setCount(request.getCount());
-        // createdAt устанавливается автоматически в BaseEntity
+        buy.setStatus("В рассмотрении");  // Устанавливаем начальный статус
 
         RequestBuy saved = requestBuyRepository.save(buy);
         return mapToRs(saved);
@@ -34,14 +35,22 @@ public class RequestBuyService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public RequestBuyRs updateStatus(Long id, String status) {
+        RequestBuy buy = requestBuyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Заявка не найдена"));
+        buy.setStatus(status);
+        return mapToRs(requestBuyRepository.save(buy));
+    }
+
     private RequestBuyRs mapToRs(RequestBuy entity) {
         return RequestBuyRs.builder()
                 .id(entity.getId())
                 .equipmentInventoryNumber(entity.getEquipmentInventoryNumber())
                 .count(entity.getCount())
                 .name(entity.getName())
-                .created_at(entity.getCreatedAt().toLocalDate())  // LocalDateTime → LocalDate
-                .status("OPEN")
+                .created_at(entity.getCreatedAt() != null ? entity.getCreatedAt().toLocalDate() : LocalDate.now())
+                .status(entity.getStatus() != null ? entity.getStatus() : "В рассмотрении")
                 .build();
     }
 }

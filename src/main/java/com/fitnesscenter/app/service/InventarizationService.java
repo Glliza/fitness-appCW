@@ -8,6 +8,7 @@ import com.fitnesscenter.app.entity.Inventarization;
 import com.fitnesscenter.app.exception.EntityNotFoundException;
 import com.fitnesscenter.app.repository.EquipmentRepository;
 import com.fitnesscenter.app.repository.InventarizationRepository;
+import com.fitnesscenter.app.repository.ZoneRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 public class InventarizationService {
     private final InventarizationRepository inventarizationRepository;
     private final EquipmentRepository equipmentRepository;
+    private final ZoneRepository zoneRepository;
+
 
     @Transactional
     public List<InventarizationRs> startInventarization(Long zoneId) {
@@ -50,6 +53,13 @@ public class InventarizationService {
         List<Inventarization> records = new ArrayList<>();
 
         for (Equipment eq : equipmentList) {
+            // Удаляем старые незавершённые инвентаризации для этого оборудования
+            List<Inventarization> oldInvs = inventarizationRepository
+                    .findByEquipmentInventoryNumber(eq.getId());
+            if (!oldInvs.isEmpty()) {
+                inventarizationRepository.deleteAll(oldInvs);
+            }
+
             Inventarization inv = new Inventarization();
             inv.setEquipmentInventoryNumber(eq.getId());
             inv.setCount(1);
@@ -69,6 +79,13 @@ public class InventarizationService {
         List<Inventarization> records = new ArrayList<>();
 
         for (Equipment eq : equipmentList) {
+            // Удаляем старые незавершённые инвентаризации для этого оборудования
+            List<Inventarization> oldInvs = inventarizationRepository
+                    .findByEquipmentInventoryNumber(eq.getId());
+            if (!oldInvs.isEmpty()) {
+                inventarizationRepository.deleteAll(oldInvs);
+            }
+
             Inventarization inv = new Inventarization();
             inv.setEquipmentInventoryNumber(eq.getId());
             inv.setCount(1);
@@ -77,23 +94,30 @@ public class InventarizationService {
             records.add(inv);
         }
 
-        inventarizationRepository.saveAll(records);
+        List<Inventarization> savedRecords = inventarizationRepository.saveAll(records);
 
-        Map<Long, List<Equipment>> byZone = equipmentList.stream()
-                .collect(Collectors.groupingBy(Equipment::getZoneId));
+        // Группировка по зонам (как было ранее)
+        Map<Long, List<Inventarization>> byZone = savedRecords.stream()
+                .collect(Collectors.groupingBy(inv -> {
+                    Equipment eq = equipmentRepository.findById(inv.getEquipmentInventoryNumber()).orElse(null);
+                    return eq != null ? eq.getZoneId() : 0L;
+                }));
 
         List<InventarizationAllRs> result = new ArrayList<>();
-        for (Map.Entry<Long, List<Equipment>> entry : byZone.entrySet()) {
+        for (Map.Entry<Long, List<Inventarization>> entry : byZone.entrySet()) {
+            String zoneName = "Неизвестно";
+            if (entry.getKey() != null && entry.getKey() != 0) {
+                com.fitnesscenter.app.entity.Zone zone = zoneRepository.findById(entry.getKey()).orElse(null);
+                if (zone != null) zoneName = zone.getName();
+            }
+
             List<InventarizationRs> items = entry.getValue().stream()
-                    .map(eq -> InventarizationRs.builder()
-                            .equipmentInventoryNumber(eq.getId())
-                            .count(1)
-                            .build())
+                    .map(this::mapToRs)
                     .collect(Collectors.toList());
 
             result.add(InventarizationAllRs.builder()
                     .zoneId(entry.getKey())
-                    .zoneName("Zone " + entry.getKey())
+                    .zoneName(zoneName)
                     .items(items)
                     .build());
         }

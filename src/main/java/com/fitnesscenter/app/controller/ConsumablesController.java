@@ -50,6 +50,24 @@ public class ConsumablesController {
 
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportReport(@RequestParam String format) {
-        return ResponseEntity.ok(consumablesService.exportBalanceReport(format));
+        byte[] report = consumablesService.exportBalanceReport(format);
+
+        String contentType;
+        String extension;
+
+        if ("pdf".equalsIgnoreCase(format)) {
+            contentType = "application/pdf";
+            extension = "pdf";
+        } else {
+            // Правильный MIME тип для Excel
+            contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            extension = "xlsx";
+        }
+
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=consumables_report." + extension)
+                .body(report);
     }
 }

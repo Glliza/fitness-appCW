@@ -7,9 +7,11 @@ import com.fitnesscenter.app.entity.ConsumablesZone;
 import com.fitnesscenter.app.exception.NegativeStockException;
 import com.fitnesscenter.app.repository.ConsumablesRepository;
 import com.fitnesscenter.app.repository.ConsumablesZoneRepository;
+import com.fitnesscenter.app.repository.ZoneRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.itextpdf.text.pdf.BaseFont;
 
 import java.io.ByteArrayOutputStream;
 import java.util.List;
@@ -26,6 +28,7 @@ import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
 import com.itextpdf.text.Font;
 import com.itextpdf.text.FontFactory;
+import com.fitnesscenter.app.entity.Zone;
 
 // Apache POI импорты с полным именем для Font
 import org.apache.poi.ss.usermodel.Workbook;
@@ -40,6 +43,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 public class ConsumablesService {
     private final ConsumablesRepository consumablesRepository;
     private final ConsumablesZoneRepository consumablesZoneRepository;
+    private final ZoneRepository zoneRepository;
 
     public ConsumablesRs getConsumablesById(Long id) {
         Consumables consumables = consumablesRepository.findById(id).orElseThrow();
@@ -116,6 +120,7 @@ public class ConsumablesService {
 
     public byte[] exportBalanceReport(String format) {
         List<ConsumablesZone> allStocks = consumablesZoneRepository.findAll();
+        System.out.println("Exporting report with " + allStocks.size() + " records");
 
         if ("pdf".equalsIgnoreCase(format)) {
             return exportToPdf(allStocks);
@@ -125,53 +130,66 @@ public class ConsumablesService {
         return new byte[0];
     }
 
+
     private byte[] exportToPdf(List<ConsumablesZone> stocks) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document document = new Document();
             PdfWriter.getInstance(document, out);
             document.open();
 
-            // Заголовок - используем FontFactory
-            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
+            // Загружаем шрифт с поддержкой кириллицы
+            BaseFont baseFont = BaseFont.createFont("src/main/resources/fonts/arial.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+            Font titleFont = new Font(baseFont, 16, Font.BOLD);
+            Font headerFont = new Font(baseFont, 12, Font.BOLD);
+            Font normalFont = new Font(baseFont, 10, Font.NORMAL);
+
+            // Заголовок
             Paragraph title = new Paragraph("Отчёт по остаткам расходных материалов", titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             document.add(title);
+
+            // Дата
+            Paragraph datePara = new Paragraph("Дата формирования: " + java.time.LocalDate.now(), normalFont);
+            datePara.setAlignment(Element.ALIGN_RIGHT);
+            document.add(datePara);
             document.add(Chunk.NEWLINE);
 
             // Таблица
-            PdfPTable table = new PdfPTable(4);
+            PdfPTable table = new PdfPTable(5);
             table.setWidthPercentage(100);
+            table.setWidths(new float[]{15f, 25f, 15f, 30f, 15f});
 
-            // Заголовки таблицы
-            String[] headers = {"ID расходника", "Название", "ID зоны", "Остаток"};
+            // Заголовки
+            String[] headers = {"ID расходника", "Название", "ID зоны", "Название зоны", "Остаток"};
             for (String header : headers) {
-                Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
                 PdfPCell cell = new PdfPCell(new Phrase(header, headerFont));
                 cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                cell.setBackgroundColor(com.itextpdf.text.BaseColor.LIGHT_GRAY);
+                cell.setPadding(5);
                 table.addCell(cell);
             }
 
             // Данные
-            Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 10);
             for (ConsumablesZone stock : stocks) {
                 String name = consumablesRepository.findById(stock.getConsumablesId())
-                        .map(c -> c.getName())
+                        .map(Consumables::getName)
                         .orElse("Неизвестно");
 
-                PdfPCell cell1 = new PdfPCell(new Phrase(String.valueOf(stock.getConsumablesId()), normalFont));
-                PdfPCell cell2 = new PdfPCell(new Phrase(name, normalFont));
-                PdfPCell cell3 = new PdfPCell(new Phrase(String.valueOf(stock.getZoneId()), normalFont));
-                PdfPCell cell4 = new PdfPCell(new Phrase(String.valueOf(stock.getCount()), normalFont));
+                String zoneName = "Неизвестно";
+                if (stock.getZoneId() != null) {
+                    zoneName = zoneRepository.findById(stock.getZoneId())
+                            .map(com.fitnesscenter.app.entity.Zone::getName)
+                            .orElse("Зона не найдена");
+                }
 
-                cell1.setHorizontalAlignment(Element.ALIGN_CENTER);
-                cell2.setHorizontalAlignment(Element.ALIGN_LEFT);
-                cell3.setHorizontalAlignment(Element.ALIGN_CENTER);
-                cell4.setHorizontalAlignment(Element.ALIGN_CENTER);
+                table.addCell(new PdfPCell(new Phrase(String.valueOf(stock.getConsumablesId()), normalFont)));
+                table.addCell(new PdfPCell(new Phrase(name, normalFont)));
+                table.addCell(new PdfPCell(new Phrase(String.valueOf(stock.getZoneId()), normalFont)));
+                table.addCell(new PdfPCell(new Phrase(zoneName, normalFont)));
 
-                table.addCell(cell1);
-                table.addCell(cell2);
-                table.addCell(cell3);
-                table.addCell(cell4);
+                PdfPCell countCell = new PdfPCell(new Phrase(String.valueOf(stock.getCount()), normalFont));
+                countCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                table.addCell(countCell);
             }
 
             document.add(table);
@@ -189,16 +207,29 @@ public class ConsumablesService {
 
             Sheet sheet = workbook.createSheet("Отчёт по остаткам");
 
-            // Заголовки
-            Row headerRow = sheet.createRow(0);
-            String[] headers = {"ID расходника", "Название", "ID зоны", "Остаток"};
-
-            // Используем полное имя org.apache.poi.ss.usermodel.Font
+            // Стиль для заголовков
+            CellStyle headerStyle = workbook.createCellStyle();
             org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
             headerFont.setBold(true);
-
-            CellStyle headerStyle = workbook.createCellStyle();
+            headerFont.setFontHeightInPoints((short) 12);
             headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(org.apache.poi.ss.usermodel.IndexedColors.LIGHT_BLUE.getIndex());
+            headerStyle.setFillPattern(org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setBorderBottom(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+            headerStyle.setBorderTop(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+            headerStyle.setBorderLeft(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+            headerStyle.setBorderRight(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+
+            // Стиль для данных
+            CellStyle dataStyle = workbook.createCellStyle();
+            dataStyle.setBorderBottom(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+            dataStyle.setBorderTop(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+            dataStyle.setBorderLeft(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+            dataStyle.setBorderRight(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+
+            // Заголовки (5 колонок)
+            Row headerRow = sheet.createRow(0);
+            String[] headers = {"ID расходника", "Название", "ID зоны", "Название зоны", "Остаток"};
 
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
@@ -215,15 +246,44 @@ public class ConsumablesService {
                         .map(c -> c.getName())
                         .orElse("Неизвестно");
 
-                row.createCell(0).setCellValue(stock.getConsumablesId());
-                row.createCell(1).setCellValue(name);
-                row.createCell(2).setCellValue(stock.getZoneId());
-                row.createCell(3).setCellValue(stock.getCount());
+                // Получаем название зоны
+                String zoneName = "Неизвестно";
+                if (stock.getZoneId() != null) {
+                    try {
+                        zoneName = zoneRepository.findById(stock.getZoneId())
+                                .map(zone -> zone.getName())
+                                .orElse("Зона не найдена");
+                    } catch (Exception e) {
+                        zoneName = "Ошибка";
+                    }
+                }
+
+                Cell cell0 = row.createCell(0);
+                cell0.setCellValue(stock.getConsumablesId());
+                cell0.setCellStyle(dataStyle);
+
+                Cell cell1 = row.createCell(1);
+                cell1.setCellValue(name);
+                cell1.setCellStyle(dataStyle);
+
+                Cell cell2 = row.createCell(2);
+                cell2.setCellValue(stock.getZoneId());
+                cell2.setCellStyle(dataStyle);
+
+                Cell cell3 = row.createCell(3);
+                cell3.setCellValue(zoneName);
+                cell3.setCellStyle(dataStyle);
+
+                Cell cell4 = row.createCell(4);
+                cell4.setCellValue(stock.getCount());
+                cell4.setCellStyle(dataStyle);
             }
 
             // Автоширина колонок
             for (int i = 0; i < headers.length; i++) {
                 sheet.autoSizeColumn(i);
+                // Добавляем небольшой отступ
+                sheet.setColumnWidth(i, sheet.getColumnWidth(i) + 500);
             }
 
             workbook.write(out);
