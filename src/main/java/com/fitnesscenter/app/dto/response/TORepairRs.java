@@ -1,6 +1,5 @@
 package com.fitnesscenter.app.dto.response;
 
-
 import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDate;
@@ -9,6 +8,7 @@ import java.time.LocalDate;
 @Builder
 public class TORepairRs {
     private Long id;
+    private Long equipmentId;  // ДОБАВЬТЕ
     private String status;
     private String description;
     private String worker;

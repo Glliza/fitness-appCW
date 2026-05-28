@@ -1,6 +1,5 @@
 package com.fitnesscenter.app.controller;
 
-
 import com.fitnesscenter.app.dto.request.TORepairRq;
 import com.fitnesscenter.app.dto.request.RequestRepairRq;
 import com.fitnesscenter.app.dto.response.TORepairRs;
@@ -14,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 import com.fitnesscenter.app.entity.Notification;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/maintenance")
@@ -28,9 +26,20 @@ public class TORepairController {
         return ResponseEntity.ok(notificationService.getUnreadNotifications(adminId));
     }
 
+    // GET для получения всех ТО - ДОБАВЬТЕ ЭТОТ МЕТОД
+    @GetMapping("/to")
+    public ResponseEntity<List<TORepairRs>> getAllTO() {
+        return ResponseEntity.ok(toRepairService.getAllTO());
+    }
+
     @PostMapping("/to")
     public ResponseEntity<TORepairRs> createTO(@RequestBody TORepairRq request) {
         return ResponseEntity.ok(toRepairService.createTO(request));
+    }
+
+    @PatchMapping("/to/{toId}/complete")
+    public ResponseEntity<TORepairRs> completeTO(@PathVariable Long toId) {
+        return ResponseEntity.ok(toRepairService.completeTO(toId));
     }
 
     @PostMapping("/repairs")
@@ -64,5 +73,4 @@ public class TORepairController {
     public ResponseEntity<LocalDate> nextTODate(@PathVariable Long equipmentId) {
         return ResponseEntity.ok(toRepairService.calculateNextTODate(equipmentId));
     }
-
 }

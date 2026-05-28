@@ -16,4 +16,7 @@ public class TORepair extends BaseEntity {
     private LocalDate plannedDate;
     private LocalDate completedDate;
     private String type;
+
+    @Column(name = "equipment_id")  // ДОБАВЬТЕ ЭТО ПОЛЕ
+    private Long equipmentId;
 }
