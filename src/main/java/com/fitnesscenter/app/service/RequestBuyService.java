@@ -7,6 +7,8 @@ import com.fitnesscenter.app.entity.RequestBuy;
 import com.fitnesscenter.app.repository.AdministratorRepository;
 import com.fitnesscenter.app.repository.RequestBuyRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
@@ -17,8 +19,21 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RequestBuyService {
     private final RequestBuyRepository requestBuyRepository;
-    private final AdministratorRepository administratorRepository;  // ДОБАВЛЕНО
-    private final NotificationService notificationService;  // ДОБАВЛЕНО
+    private final AdministratorRepository administratorRepository;
+    private final NotificationService notificationService;
+
+    // Новый метод с пагинацией
+    public Page<RequestBuyRs> getAllRequests(Pageable pageable) {
+        return requestBuyRepository.findAll(pageable)
+                .map(this::mapToRs);
+    }
+
+    // Старый метод для совместимости (если нужен)
+    public List<RequestBuyRs> getAllRequestsList() {
+        return requestBuyRepository.findAll().stream()
+                .map(this::mapToRs)
+                .collect(Collectors.toList());
+    }
 
     @Transactional
     public RequestBuyRs createRequest(RequestBuyRq request) {
@@ -30,7 +45,6 @@ public class RequestBuyService {
 
         RequestBuy saved = requestBuyRepository.save(buy);
 
-        // Уведомление всем админам о новой заявке на закупку
         String message = String.format("Создана новая заявка на закупку: %s в количестве %d шт.",
                 request.getName(), request.getCount());
 
@@ -42,12 +56,6 @@ public class RequestBuyService {
         return mapToRs(saved);
     }
 
-    public List<RequestBuyRs> getAllRequests() {
-        return requestBuyRepository.findAll().stream()
-                .map(this::mapToRs)
-                .collect(Collectors.toList());
-    }
-
     @Transactional
     public RequestBuyRs updateStatus(Long id, String status) {
         RequestBuy buy = requestBuyRepository.findById(id)
@@ -57,7 +65,6 @@ public class RequestBuyService {
         buy.setStatus(status);
         RequestBuyRs result = mapToRs(requestBuyRepository.save(buy));
 
-        // Уведомление всем админам об изменении статуса заявки на закупку
         String message = String.format("Заявка на закупку №%d: статус изменён с '%s' на '%s'",
                 id, oldStatus, status);
 

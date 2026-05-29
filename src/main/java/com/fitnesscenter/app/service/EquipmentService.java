@@ -7,6 +7,8 @@ import com.fitnesscenter.app.entity.Zone;
 import com.fitnesscenter.app.exception.EntityNotFoundException;
 import com.fitnesscenter.app.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -27,7 +29,32 @@ public class EquipmentService {
         return mapToRs(equipment);
     }
 
-    public List<EquipmentRs> getAllEquipment() {
+    // Новый метод с пагинацией для всех
+    public Page<EquipmentRs> getAllEquipment(Pageable pageable) {
+        return equipmentRepository.findAllByDeletedFalse(pageable)
+                .map(this::mapToRs);
+    }
+
+    // Новый метод с пагинацией и фильтрацией по зоне
+    public Page<EquipmentRs> getEquipmentByZone(Long zoneId, Pageable pageable) {
+        return equipmentRepository.findByZoneIdAndDeletedFalse(zoneId, pageable)
+                .map(this::mapToRs);
+    }
+
+    // Новый метод с пагинацией и фильтрацией по статусу
+    public Page<EquipmentRs> getEquipmentByStatus(String status, Pageable pageable) {
+        return equipmentRepository.findByStatusAndDeletedFalse(status, pageable)
+                .map(this::mapToRs);
+    }
+
+    // Новый метод с пагинацией и фильтрацией по зоне и статусу
+    public Page<EquipmentRs> getEquipmentByZoneAndStatus(Long zoneId, String status, Pageable pageable) {
+        return equipmentRepository.findByZoneIdAndStatusAndDeletedFalse(zoneId, status, pageable)
+                .map(this::mapToRs);
+    }
+
+    // Старые методы оставляем для совместимости
+    public List<EquipmentRs> getAllEquipmentList() {
         return equipmentRepository.findAllByDeletedFalse().stream()
                 .map(this::mapToRs)
                 .collect(Collectors.toList());
@@ -39,7 +66,6 @@ public class EquipmentService {
         System.out.println("zoneId: " + request.getZoneId());
         System.out.println("name: " + request.getName());
 
-        // Проверяем вместимость зоны
         checkZoneCapacity(request.getZoneId());
 
         Zone zone = zoneRepository.findByIdAndDeletedFalse(request.getZoneId())
@@ -64,7 +90,6 @@ public class EquipmentService {
         Long oldZoneId = equipment.getZoneId();
         Long newZoneId = request.getZoneId();
 
-        // Если зона меняется, проверяем вместимость новой зоны
         if (newZoneId != null && !newZoneId.equals(oldZoneId)) {
             checkZoneCapacity(newZoneId);
             equipment.setZoneId(newZoneId);
@@ -95,13 +120,13 @@ public class EquipmentService {
         equipmentRepository.save(equipment);
     }
 
-    public List<EquipmentRs> getByZone(Long zoneId) {
+    public List<EquipmentRs> getByZoneList(Long zoneId) {
         return equipmentRepository.findByZoneIdAndDeletedFalse(zoneId).stream()
                 .map(this::mapToRs)
                 .collect(Collectors.toList());
     }
 
-    public List<EquipmentRs> getByStatus(String status) {
+    public List<EquipmentRs> getByStatusList(String status) {
         return equipmentRepository.findByStatusAndDeletedFalse(status).stream()
                 .map(this::mapToRs)
                 .collect(Collectors.toList());

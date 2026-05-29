@@ -1,10 +1,13 @@
 package com.fitnesscenter.app.controller;
 
-
 import com.fitnesscenter.app.dto.response.ConsumablesRs;
 import com.fitnesscenter.app.dto.response.ConsumablesZonesRs;
 import com.fitnesscenter.app.service.ConsumablesService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -20,9 +23,17 @@ public class ConsumablesController {
         return ResponseEntity.ok(consumablesService.getConsumablesById(id));
     }
 
+    // Новый метод с пагинацией
     @GetMapping
-    public ResponseEntity<List<ConsumablesRs>> getAll() {
-        return ResponseEntity.ok(consumablesService.getAllConsumables());
+    public ResponseEntity<Page<ConsumablesRs>> getAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+
+        Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return ResponseEntity.ok(consumablesService.getAllConsumables(pageable));
     }
 
     @PostMapping("/income")
@@ -59,7 +70,6 @@ public class ConsumablesController {
             contentType = "application/pdf";
             extension = "pdf";
         } else {
-            // Правильный MIME тип для Excel
             contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
             extension = "xlsx";
         }

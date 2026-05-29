@@ -1,6 +1,5 @@
 package com.fitnesscenter.app.service;
 
-
 import com.fitnesscenter.app.dto.request.ZoneRq;
 import com.fitnesscenter.app.dto.response.ZoneRs;
 import com.fitnesscenter.app.dto.response.ConsumablesZonesRs;
@@ -10,6 +9,8 @@ import com.fitnesscenter.app.exception.ZoneHasEquipmentException;
 import com.fitnesscenter.app.repository.EquipmentRepository;
 import com.fitnesscenter.app.repository.ZoneRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -27,7 +28,14 @@ public class ZoneService {
         return mapToRs(zone);
     }
 
-    public List<ZoneRs> getAllZones() {
+    // Новый метод с пагинацией
+    public Page<ZoneRs> getAllZones(Pageable pageable) {
+        return zoneRepository.findAllByDeletedFalse(pageable)
+                .map(this::mapToRs);
+    }
+
+    // Старый метод оставляем для совместимости (если нужно)
+    public List<ZoneRs> getAllZonesList() {
         return zoneRepository.findAllByDeletedFalse().stream()
                 .map(this::mapToRs)
                 .collect(Collectors.toList());
@@ -82,7 +90,6 @@ public class ZoneService {
     }
 
     public List<ConsumablesZonesRs> getConsumablesByZone(Long zoneId) {
-        // логика получения расходников по зоне
         return List.of();
     }
 

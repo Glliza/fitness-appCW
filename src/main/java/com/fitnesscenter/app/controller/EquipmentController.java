@@ -1,13 +1,15 @@
 package com.fitnesscenter.app.controller;
 
-
 import com.fitnesscenter.app.dto.request.EquipmentRq;
 import com.fitnesscenter.app.dto.response.EquipmentRs;
 import com.fitnesscenter.app.service.EquipmentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/equipment")
@@ -20,9 +22,32 @@ public class EquipmentController {
         return ResponseEntity.ok(equipmentService.getEquipmentById(id));
     }
 
+    // Новый метод с пагинацией и фильтрацией
     @GetMapping
-    public ResponseEntity<List<EquipmentRs>> getAll() {
-        return ResponseEntity.ok(equipmentService.getAllEquipment());
+    public ResponseEntity<Page<EquipmentRs>> getAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir,
+            @RequestParam(required = false) Long zoneId,
+            @RequestParam(required = false) String status) {
+
+        Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<EquipmentRs> result;
+
+        if (zoneId != null && status != null && !status.isEmpty()) {
+            result = equipmentService.getEquipmentByZoneAndStatus(zoneId, status, pageable);
+        } else if (zoneId != null) {
+            result = equipmentService.getEquipmentByZone(zoneId, pageable);
+        } else if (status != null && !status.isEmpty()) {
+            result = equipmentService.getEquipmentByStatus(status, pageable);
+        } else {
+            result = equipmentService.getAllEquipment(pageable);
+        }
+
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping
@@ -39,16 +64,6 @@ public class EquipmentController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<EquipmentRs> changeStatus(@PathVariable Long id, @RequestParam String status) {
         return ResponseEntity.ok(equipmentService.changeStatus(id, status));
-    }
-
-    @GetMapping("/zone/{zoneId}")
-    public ResponseEntity<List<EquipmentRs>> getByZone(@PathVariable Long zoneId) {
-        return ResponseEntity.ok(equipmentService.getByZone(zoneId));
-    }
-
-    @GetMapping("/status/{status}")
-    public ResponseEntity<List<EquipmentRs>> getByStatus(@PathVariable String status) {
-        return ResponseEntity.ok(equipmentService.getByStatus(status));
     }
 
     @PutMapping("/{id}")

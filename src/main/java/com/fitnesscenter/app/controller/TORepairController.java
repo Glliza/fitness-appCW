@@ -8,6 +8,10 @@ import com.fitnesscenter.app.dto.response.EquipmentHistoryRs;
 import com.fitnesscenter.app.service.NotificationService;
 import com.fitnesscenter.app.service.TORepairService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
@@ -26,10 +30,17 @@ public class TORepairController {
         return ResponseEntity.ok(notificationService.getUnreadNotifications(adminId));
     }
 
-    // GET для получения всех ТО - ДОБАВЬТЕ ЭТОТ МЕТОД
+    // GET для получения всех ТО с пагинацией
     @GetMapping("/to")
-    public ResponseEntity<List<TORepairRs>> getAllTO() {
-        return ResponseEntity.ok(toRepairService.getAllTO());
+    public ResponseEntity<Page<TORepairRs>> getAllTO(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+
+        Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return ResponseEntity.ok(toRepairService.getAllTO(pageable));
     }
 
     @PostMapping("/to")
@@ -56,12 +67,19 @@ public class TORepairController {
     }
 
     @GetMapping("/repairs")
-    public ResponseEntity<List<RequestRepairRs>> getRequests(
+    public ResponseEntity<Page<RequestRepairRs>> getRequests(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) LocalDate start,
             @RequestParam(required = false) LocalDate end,
             @RequestParam(required = false) Long equipmentId) {
-        return ResponseEntity.ok(toRepairService.getRequestsByFilters(type, start, end, equipmentId));
+
+        Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return ResponseEntity.ok(toRepairService.getRequestsByFilters(type, start, end, equipmentId, pageable));
     }
 
     @GetMapping("/history/{equipmentId}")

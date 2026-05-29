@@ -13,10 +13,7 @@ public class Zone extends BaseEntity {
 
     @Column(unique = true, nullable = false)
     private String name;
-
     private String description;
-
     private Integer capacity;
-
     private Integer floor;
 }

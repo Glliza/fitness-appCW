@@ -9,6 +9,8 @@ import com.fitnesscenter.app.repository.ConsumablesRepository;
 import com.fitnesscenter.app.repository.ConsumablesZoneRepository;
 import com.fitnesscenter.app.repository.ZoneRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.itextpdf.text.pdf.BaseFont;
@@ -30,7 +32,7 @@ import com.itextpdf.text.Font;
 import com.itextpdf.text.FontFactory;
 import com.fitnesscenter.app.entity.Zone;
 
-// Apache POI импорты с полным именем для Font
+// Apache POI импорты
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Row;
@@ -50,7 +52,14 @@ public class ConsumablesService {
         return mapToRs(consumables);
     }
 
-    public List<ConsumablesRs> getAllConsumables() {
+    // Новый метод с пагинацией
+    public Page<ConsumablesRs> getAllConsumables(Pageable pageable) {
+        return consumablesRepository.findAll(pageable)
+                .map(this::mapToRs);
+    }
+
+    // Старый метод для совместимости
+    public List<ConsumablesRs> getAllConsumablesList() {
         return consumablesRepository.findAll().stream()
                 .map(this::mapToRs)
                 .collect(Collectors.toList());
@@ -102,6 +111,17 @@ public class ConsumablesService {
                 .orElse(0);
     }
 
+    // Метод для получения балансов по всем зонам для таблицы (с пагинацией по зонам)
+    public Page<ZoneBalanceDto> getZoneBalances(Pageable pageable) {
+        Page<Zone> zonesPage = zoneRepository.findAllByDeletedFalse(pageable);
+        return zonesPage.map(zone -> {
+            ZoneBalanceDto dto = new ZoneBalanceDto();
+            dto.setZoneId(zone.getId());
+            dto.setZoneName(zone.getName());
+            return dto;
+        });
+    }
+
     private ConsumablesRs mapToRs(Consumables entity) {
         return ConsumablesRs.builder()
                 .id(entity.getId())
@@ -128,6 +148,20 @@ public class ConsumablesService {
             return exportToExcel(allStocks);
         }
         return new byte[0];
+    }
+
+    // Вспомогательный DTO для балансов
+    public static class ZoneBalanceDto {
+        private Long zoneId;
+        private String zoneName;
+        private java.util.Map<Long, Integer> balances = new java.util.HashMap<>();
+
+        public Long getZoneId() { return zoneId; }
+        public void setZoneId(Long zoneId) { this.zoneId = zoneId; }
+        public String getZoneName() { return zoneName; }
+        public void setZoneName(String zoneName) { this.zoneName = zoneName; }
+        public java.util.Map<Long, Integer> getBalances() { return balances; }
+        public void setBalances(java.util.Map<Long, Integer> balances) { this.balances = balances; }
     }
 
 

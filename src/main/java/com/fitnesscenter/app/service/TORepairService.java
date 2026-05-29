@@ -11,6 +11,8 @@ import com.fitnesscenter.app.entity.TORepair;
 import com.fitnesscenter.app.entity.RequestRepair;
 import com.fitnesscenter.app.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
@@ -25,29 +27,19 @@ public class TORepairService {
     private final EquipmentHistoryRepository equipmentHistoryRepository;
     private final NotificationService notificationService;
     private final EquipmentRepository equipmentRepository;
-    private final AdministratorRepository administratorRepository;  // ДОБАВЛЕНО
+    private final AdministratorRepository administratorRepository;
 
-    @Transactional
-    public RequestRepairRs updateRequestStatus(Long requestId, String status, String worker) {
-        RequestRepair repair = requestRepairRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+    // ========== МЕТОДЫ ДЛЯ ТО ==========
 
-        String oldStatus = repair.getStatus();
-        repair.setStatus(status);
-        repair.setWorker(worker);
+    public Page<TORepairRs> getAllTO(Pageable pageable) {
+        return toRepairRepository.findAll(pageable)
+                .map(this::mapToRs);
+    }
 
-        RequestRepairRs result = mapToRs(requestRepairRepository.save(repair));
-
-        // Отправляем уведомление ВСЕМ администраторам
-        String message = String.format("Заявка на ремонт №%d: статус изменён с '%s' на '%s'",
-                requestId, oldStatus, status);
-
-        List<Administrator> allAdmins = administratorRepository.findAll();
-        for (Administrator admin : allAdmins) {
-            notificationService.notifyAdmin(admin.getId(), "Изменение статуса заявки на ремонт", message);
-        }
-
-        return result;
+    public List<TORepairRs> getAllTOList() {
+        return toRepairRepository.findAll().stream()
+                .map(this::mapToRs)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -69,7 +61,6 @@ public class TORepairService {
 
         TORepair saved = toRepairRepository.save(toRepair);
 
-        // Уведомление всем админам о создании ТО
         String message = String.format("Создано новое плановое ТО для оборудования ID=%d на дату %s",
                 request.getEquipmentId(), request.getPlannedDate());
 
@@ -79,6 +70,59 @@ public class TORepairService {
         }
 
         return mapToRs(saved);
+    }
+
+    @Transactional
+    public TORepairRs completeTO(Long toId) {
+        TORepair toRepair = toRepairRepository.findById(toId)
+                .orElseThrow(() -> new RuntimeException("TO not found"));
+
+        if ("Выполнена".equals(toRepair.getStatus())) {
+            throw new RuntimeException("ТО уже выполнено");
+        }
+
+        toRepair.setStatus("Выполнена");
+        toRepair.setCompletedDate(LocalDate.now());
+        TORepair saved = toRepairRepository.save(toRepair);
+
+        List<TORepair> existingPlanned = toRepairRepository
+                .findByEquipmentIdAndStatus(saved.getEquipmentId(), "Запланировано");
+
+        LocalDate nextDate = null;
+        if (existingPlanned.isEmpty()) {
+            nextDate = calculateNextTODate(saved.getEquipmentId());
+            TORepair nextTO = new TORepair();
+            nextTO.setEquipmentId(saved.getEquipmentId());
+            nextTO.setType(saved.getType());
+            nextTO.setPlannedDate(nextDate);
+            nextTO.setDescription("Плановое ТО (автоматически)");
+            nextTO.setStatus("Запланировано");
+            toRepairRepository.save(nextTO);
+        }
+
+        String message = String.format("ТО №%d для оборудования ID=%d завершено. %s",
+                toId, saved.getEquipmentId(),
+                nextDate != null ? "Следующее ТО запланировано на " + nextDate : "");
+
+        List<Administrator> allAdmins = administratorRepository.findAll();
+        for (Administrator admin : allAdmins) {
+            notificationService.notifyAdmin(admin.getId(), "Завершение ТО", message);
+        }
+
+        return mapToRs(saved);
+    }
+
+    // ========== МЕТОДЫ ДЛЯ ЗАЯВОК НА РЕМОНТ ==========
+
+    public Page<RequestRepairRs> getRequestsByFilters(String type, LocalDate startDate, LocalDate endDate, Long equipmentId, Pageable pageable) {
+        return requestRepairRepository.findAll(pageable)
+                .map(this::mapToRs);
+    }
+
+    public List<RequestRepairRs> getAllRequestsList() {
+        return requestRepairRepository.findAll().stream()
+                .map(this::mapToRs)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -92,7 +136,6 @@ public class TORepairService {
 
         RequestRepair saved = requestRepairRepository.save(repair);
 
-        // Уведомление всем админам о новой заявке
         String message = String.format("Создана новая заявка на ремонт для оборудования №%d от %s",
                 request.getEquipmentInventoryNumber(), request.getCreator());
 
@@ -104,11 +147,29 @@ public class TORepairService {
         return mapToRs(saved);
     }
 
-    public List<RequestRepairRs> getRequestsByFilters(String type, LocalDate startDate, LocalDate endDate, Long equipmentId) {
-        return requestRepairRepository.findAll().stream()
-                .map(this::mapToRs)
-                .collect(Collectors.toList());
+    @Transactional
+    public RequestRepairRs updateRequestStatus(Long requestId, String status, String worker) {
+        RequestRepair repair = requestRepairRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        String oldStatus = repair.getStatus();
+        repair.setStatus(status);
+        repair.setWorker(worker);
+
+        RequestRepairRs result = mapToRs(requestRepairRepository.save(repair));
+
+        String message = String.format("Заявка на ремонт №%d: статус изменён с '%s' на '%s'",
+                requestId, oldStatus, status);
+
+        List<Administrator> allAdmins = administratorRepository.findAll();
+        for (Administrator admin : allAdmins) {
+            notificationService.notifyAdmin(admin.getId(), "Изменение статуса заявки на ремонт", message);
+        }
+
+        return result;
     }
+
+    // ========== ОБЩИЕ МЕТОДЫ ==========
 
     public List<EquipmentHistoryRs> getMaintenanceHistory(Long equipmentId) {
         return equipmentHistoryRepository.findByEquipmentHistoryNumber(String.valueOf(equipmentId)).stream()
@@ -124,9 +185,6 @@ public class TORepairService {
     }
 
     public LocalDate calculateNextTODate(Long equipmentId) {
-        System.out.println("=== РАСЧЁТ ДАТЫ СЛЕДУЮЩЕГО ТО ===");
-        System.out.println("Equipment ID: " + equipmentId);
-
         List<TORepair> completedTOs = toRepairRepository.findByEquipmentIdAndStatus(equipmentId, "Выполнена");
 
         LocalDate lastCompletedDate = null;
@@ -139,7 +197,6 @@ public class TORepairService {
 
             if (lastTO != null && lastTO.getCompletedDate() != null) {
                 lastCompletedDate = lastTO.getCompletedDate();
-                System.out.println("Последняя выполненная дата: " + lastCompletedDate);
             }
         }
 
@@ -147,79 +204,19 @@ public class TORepairService {
 
         if (lastCompletedDate != null) {
             nextDate = lastCompletedDate.plusDays(90);
-            System.out.println("Следующая дата от последнего ТО: " + nextDate);
         } else {
             Equipment equipment = equipmentRepository.findById(equipmentId).orElse(null);
             if (equipment != null && equipment.getDataBuy() != null) {
                 nextDate = equipment.getDataBuy().plusDays(90);
-                System.out.println("Следующая дата от даты покупки (" + equipment.getDataBuy() + "): " + nextDate);
             } else {
                 nextDate = LocalDate.now().plusDays(90);
-                System.out.println("Следующая дата от сегодня: " + nextDate);
             }
         }
 
         return nextDate;
     }
 
-    @Transactional
-    public TORepairRs completeTO(Long toId) {
-        System.out.println("=== ЗАВЕРШЕНИЕ ТО ===");
-        System.out.println("TO ID: " + toId);
-
-        TORepair toRepair = toRepairRepository.findById(toId)
-                .orElseThrow(() -> new RuntimeException("TO not found"));
-
-        System.out.println("Текущий статус: " + toRepair.getStatus());
-        System.out.println("Equipment ID: " + toRepair.getEquipmentId());
-
-        if ("Выполнена".equals(toRepair.getStatus())) {
-            throw new RuntimeException("ТО уже выполнено");
-        }
-
-        toRepair.setStatus("Выполнена");
-        toRepair.setCompletedDate(LocalDate.now());
-        TORepair saved = toRepairRepository.save(toRepair);
-
-        System.out.println("Установлена дата завершения: " + saved.getCompletedDate());
-
-        List<TORepair> existingPlanned = toRepairRepository
-                .findByEquipmentIdAndStatus(saved.getEquipmentId(), "Запланировано");
-
-        System.out.println("Существующих запланированных ТО: " + existingPlanned.size());
-
-        LocalDate nextDate = null;
-        if (existingPlanned.isEmpty()) {
-            nextDate = calculateNextTODate(saved.getEquipmentId());
-            System.out.println("Создаём новое ТО на дату: " + nextDate);
-
-            TORepair nextTO = new TORepair();
-            nextTO.setEquipmentId(saved.getEquipmentId());
-            nextTO.setType(saved.getType());
-            nextTO.setPlannedDate(nextDate);
-            nextTO.setDescription("Плановое ТО (автоматически)");
-            nextTO.setStatus("Запланировано");
-            toRepairRepository.save(nextTO);
-        }
-
-        // Уведомление всем админам о завершении ТО
-        String message = String.format("ТО №%d для оборудования ID=%d завершено. %s",
-                toId, saved.getEquipmentId(),
-                nextDate != null ? "Следующее ТО запланировано на " + nextDate : "");
-
-        List<Administrator> allAdmins = administratorRepository.findAll();
-        for (Administrator admin : allAdmins) {
-            notificationService.notifyAdmin(admin.getId(), "Завершение ТО", message);
-        }
-
-        return mapToRs(saved);
-    }
-
-    public List<TORepairRs> getAllTO() {
-        return toRepairRepository.findAll().stream()
-                .map(this::mapToRs)
-                .collect(Collectors.toList());
-    }
+    // ========== MAPPER МЕТОДЫ ==========
 
     private TORepairRs mapToRs(TORepair entity) {
         return TORepairRs.builder()

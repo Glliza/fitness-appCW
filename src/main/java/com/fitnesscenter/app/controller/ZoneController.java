@@ -1,11 +1,14 @@
 package com.fitnesscenter.app.controller;
 
-
 import com.fitnesscenter.app.dto.request.ZoneRq;
 import com.fitnesscenter.app.dto.response.ZoneRs;
 import com.fitnesscenter.app.dto.response.ConsumablesZonesRs;
 import com.fitnesscenter.app.service.ZoneService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -21,9 +24,17 @@ public class ZoneController {
         return ResponseEntity.ok(zoneService.getZoneById(id));
     }
 
+    // Новый метод с пагинацией
     @GetMapping
-    public ResponseEntity<List<ZoneRs>> getAll() {
-        return ResponseEntity.ok(zoneService.getAllZones());
+    public ResponseEntity<Page<ZoneRs>> getAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+
+        Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return ResponseEntity.ok(zoneService.getAllZones(pageable));
     }
 
     @PostMapping
