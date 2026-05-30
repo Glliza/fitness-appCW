@@ -13,8 +13,10 @@ public class Notification extends BaseEntity {
 
     private Long adminId;
 
+
     private String title;
 
+    @Column(name = "name", length = 1000)
     private String message;
 
     private Boolean isRead = false;

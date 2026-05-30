@@ -11,6 +11,7 @@ import java.time.LocalDate;
 @Table(name = "request_buy")
 public class RequestBuy extends BaseEntity {
     private Long equipmentInventoryNumber;
+    @Column(name = "name", length = 255)
     private String name;
     private Integer count;
     private String status;
