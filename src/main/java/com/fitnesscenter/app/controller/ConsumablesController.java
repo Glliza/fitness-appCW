@@ -1,8 +1,10 @@
 package com.fitnesscenter.app.controller;
 
+import com.fitnesscenter.app.dto.request.ConsumablesZonesRq;
 import com.fitnesscenter.app.dto.response.ConsumablesRs;
 import com.fitnesscenter.app.dto.response.ConsumablesZonesRs;
 import com.fitnesscenter.app.service.ConsumablesService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -10,7 +12,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/consumables")
@@ -23,7 +24,6 @@ public class ConsumablesController {
         return ResponseEntity.ok(consumablesService.getConsumablesById(id));
     }
 
-    // Новый метод с пагинацией
     @GetMapping
     public ResponseEntity<Page<ConsumablesRs>> getAll(
             @RequestParam(defaultValue = "0") int page,
@@ -37,19 +37,19 @@ public class ConsumablesController {
     }
 
     @PostMapping("/income")
-    public ResponseEntity<ConsumablesZonesRs> addIncome(
-            @RequestParam Long consumableId,
-            @RequestParam Long zoneId,
-            @RequestParam Integer amount) {
-        return ResponseEntity.ok(consumablesService.addIncome(consumableId, zoneId, amount));
+    public ResponseEntity<ConsumablesZonesRs> addIncome(@Valid @RequestBody ConsumablesZonesRq request) {
+        return ResponseEntity.ok(consumablesService.addIncome(
+                request.getConsumablesId(),
+                request.getZoneId(),
+                request.getCount()));
     }
 
     @PostMapping("/expense")
-    public ResponseEntity<ConsumablesZonesRs> addExpense(
-            @RequestParam Long consumableId,
-            @RequestParam Long zoneId,
-            @RequestParam Integer amount) {
-        return ResponseEntity.ok(consumablesService.addExpense(consumableId, zoneId, amount));
+    public ResponseEntity<ConsumablesZonesRs> addExpense(@Valid @RequestBody ConsumablesZonesRq request) {
+        return ResponseEntity.ok(consumablesService.addExpense(
+                request.getConsumablesId(),
+                request.getZoneId(),
+                request.getCount()));
     }
 
     @GetMapping("/balance")

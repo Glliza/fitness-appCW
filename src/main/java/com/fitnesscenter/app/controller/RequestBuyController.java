@@ -4,6 +4,7 @@ import com.fitnesscenter.app.dto.request.RequestBuyRq;
 import com.fitnesscenter.app.dto.request.UpdateRequestBuyStatusRq;
 import com.fitnesscenter.app.dto.response.RequestBuyRs;
 import com.fitnesscenter.app.service.RequestBuyService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -31,14 +32,14 @@ public class RequestBuyController {
     }
 
     @PostMapping
-    public ResponseEntity<RequestBuyRs> create(@RequestBody RequestBuyRq request) {
+    public ResponseEntity<RequestBuyRs> create(@Valid @RequestBody RequestBuyRq request) {
         return ResponseEntity.ok(requestBuyService.createRequest(request));
     }
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<RequestBuyRs> updateStatus(
             @PathVariable Long id,
-            @RequestBody UpdateRequestBuyStatusRq request) {
+            @Valid @RequestBody UpdateRequestBuyStatusRq request) {
         return ResponseEntity.ok(requestBuyService.updateStatus(id, request.getStatus()));
     }
 }

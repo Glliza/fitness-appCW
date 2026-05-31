@@ -12,32 +12,11 @@ import com.fitnesscenter.app.repository.ZoneRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-// iText импорты
-import com.itextpdf.text.Document;
-import com.itextpdf.text.Element;
-import com.itextpdf.text.Chunk;
-import com.itextpdf.text.Paragraph;
-import com.itextpdf.text.Phrase;
-import com.itextpdf.text.pdf.PdfPCell;
-import com.itextpdf.text.pdf.PdfPTable;
-import com.itextpdf.text.pdf.PdfWriter;
-import com.itextpdf.text.FontFactory;
-
-// Apache POI импорты
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 @Service
 @RequiredArgsConstructor
@@ -46,48 +25,45 @@ public class InventarizationService {
     private final EquipmentRepository equipmentRepository;
     private final ZoneRepository zoneRepository;
 
-
     @Transactional
     public List<InventarizationRs> startInventarization(Long zoneId) {
+        // Сначала удаляем старые незавершённые инвентаризации для этой зоны
+        List<Inventarization> oldInvs = inventarizationRepository.findByZoneId(zoneId);
+        if (!oldInvs.isEmpty()) {
+            inventarizationRepository.deleteAll(oldInvs);
+        }
+
         List<Equipment> equipmentList = equipmentRepository.findByZoneIdAndDeletedFalse(zoneId);
         List<Inventarization> records = new ArrayList<>();
 
         for (Equipment eq : equipmentList) {
-            // Удаляем старые незавершённые инвентаризации для этого оборудования
-            List<Inventarization> oldInvs = inventarizationRepository
-                    .findByEquipmentInventoryNumber(eq.getId());
-            if (!oldInvs.isEmpty()) {
-                inventarizationRepository.deleteAll(oldInvs);
-            }
-
             Inventarization inv = new Inventarization();
             inv.setEquipmentInventoryNumber(eq.getId());
+            inv.setZoneId(zoneId);
             inv.setCount(1);
             inv.setRealCount(null);
             inv.setDate(LocalDate.now());
             records.add(inv);
         }
 
-        return inventarizationRepository.saveAll(records).stream()
+        List<Inventarization> saved = inventarizationRepository.saveAll(records);
+        return saved.stream()
                 .map(this::mapToRs)
                 .collect(Collectors.toList());
     }
 
     @Transactional
     public List<InventarizationAllRs> startInventarization() {
+        // Сначала удаляем все старые незавершённые инвентаризации
+        inventarizationRepository.deleteAll();
+
         List<Equipment> equipmentList = equipmentRepository.findAllByDeletedFalse();
         List<Inventarization> records = new ArrayList<>();
 
         for (Equipment eq : equipmentList) {
-            // Удаляем старые незавершённые инвентаризации для этого оборудования
-            List<Inventarization> oldInvs = inventarizationRepository
-                    .findByEquipmentInventoryNumber(eq.getId());
-            if (!oldInvs.isEmpty()) {
-                inventarizationRepository.deleteAll(oldInvs);
-            }
-
             Inventarization inv = new Inventarization();
             inv.setEquipmentInventoryNumber(eq.getId());
+            inv.setZoneId(eq.getZoneId());
             inv.setCount(1);
             inv.setRealCount(null);
             inv.setDate(LocalDate.now());
@@ -96,18 +72,14 @@ public class InventarizationService {
 
         List<Inventarization> savedRecords = inventarizationRepository.saveAll(records);
 
-        // Группировка по зонам (как было ранее)
         Map<Long, List<Inventarization>> byZone = savedRecords.stream()
-                .collect(Collectors.groupingBy(inv -> {
-                    Equipment eq = equipmentRepository.findById(inv.getEquipmentInventoryNumber()).orElse(null);
-                    return eq != null ? eq.getZoneId() : 0L;
-                }));
+                .collect(Collectors.groupingBy(Inventarization::getZoneId));
 
         List<InventarizationAllRs> result = new ArrayList<>();
         for (Map.Entry<Long, List<Inventarization>> entry : byZone.entrySet()) {
             String zoneName = "Неизвестно";
-            if (entry.getKey() != null && entry.getKey() != 0) {
-                com.fitnesscenter.app.entity.Zone zone = zoneRepository.findById(entry.getKey()).orElse(null);
+            if (entry.getKey() != null) {
+                var zone = zoneRepository.findById(entry.getKey()).orElse(null);
                 if (zone != null) zoneName = zone.getName();
             }
 
@@ -128,54 +100,81 @@ public class InventarizationService {
     public InventarizationRs performStep(Long inventarizationId, Integer actualCount) {
         Inventarization inv = inventarizationRepository.findById(inventarizationId)
                 .orElseThrow(() -> new EntityNotFoundException("Inventarization", inventarizationId));
+
         inv.setRealCount(actualCount);
         return mapToRs(inventarizationRepository.save(inv));
     }
 
     @Transactional
     public InventarizationReportRs finishInventarization(Long zoneId) {
-        List<Equipment> equipmentList = equipmentRepository.findByZoneIdAndDeletedFalse(zoneId);
-        List<String> discrepancies = new ArrayList<>();
+        List<Inventarization> zoneInventarizations = inventarizationRepository.findByZoneId(zoneId);
 
-        for (Equipment eq : equipmentList) {
-            inventarizationRepository.findByEquipmentInventoryNumber(eq.getId())
-                    .stream()
-                    .filter(inv -> inv.getRealCount() != null && !inv.getCount().equals(inv.getRealCount()))
-                    .forEach(inv -> discrepancies.add("Equipment " + eq.getId() +
-                            ": expected " + inv.getCount() + ", actual " + inv.getRealCount()));
+        List<String> discrepancies = new ArrayList<>();
+        int totalScanned = 0;
+
+        for (Inventarization inv : zoneInventarizations) {
+            Equipment eq = equipmentRepository.findById(inv.getEquipmentInventoryNumber()).orElse(null);
+            String equipmentName = eq != null ? eq.getName() : "Оборудование №" + inv.getEquipmentInventoryNumber();
+
+            if (inv.getRealCount() != null) {
+                totalScanned++;
+                if (!inv.getCount().equals(inv.getRealCount())) {
+                    discrepancies.add(String.format("%s: ожидалось %d, фактически %d",
+                            equipmentName, inv.getCount(), inv.getRealCount()));
+                }
+            } else {
+                discrepancies.add(String.format("%s: не проверено", equipmentName));
+            }
         }
 
         return InventarizationReportRs.builder()
                 .zoneId(zoneId)
                 .discrepancies(discrepancies)
-                .totalScanned(equipmentList.size())
+                .totalScanned(totalScanned)
                 .date(LocalDate.now())
                 .build();
     }
 
     @Transactional
     public InventarizationReportRs finishInventarization() {
-        List<Equipment> equipmentList = equipmentRepository.findAllByDeletedFalse();
-        List<String> discrepancies = new ArrayList<>();
+        List<Inventarization> allInventarizations = inventarizationRepository.findAll();
 
-        for (Equipment eq : equipmentList) {
-            inventarizationRepository.findByEquipmentInventoryNumber(eq.getId())
-                    .stream()
-                    .filter(inv -> inv.getRealCount() != null && !inv.getCount().equals(inv.getRealCount()))
-                    .forEach(inv -> discrepancies.add("Equipment " + eq.getId() +
-                            ": expected " + inv.getCount() + ", actual " + inv.getRealCount()));
+        List<String> discrepancies = new ArrayList<>();
+        int totalScanned = 0;
+
+        Map<Long, List<Inventarization>> byZone = allInventarizations.stream()
+                .collect(Collectors.groupingBy(Inventarization::getZoneId));
+
+        for (Map.Entry<Long, List<Inventarization>> entry : byZone.entrySet()) {
+            String zoneName = "Неизвестно";
+            if (entry.getKey() != null) {
+                var zone = zoneRepository.findById(entry.getKey()).orElse(null);
+                if (zone != null) zoneName = zone.getName();
+            }
+            discrepancies.add("=== Зона: " + zoneName + " ===");
+
+            for (Inventarization inv : entry.getValue()) {
+                Equipment eq = equipmentRepository.findById(inv.getEquipmentInventoryNumber()).orElse(null);
+                String equipmentName = eq != null ? eq.getName() : "Оборудование №" + inv.getEquipmentInventoryNumber();
+
+                if (inv.getRealCount() != null) {
+                    totalScanned++;
+                    if (!inv.getCount().equals(inv.getRealCount())) {
+                        discrepancies.add(String.format("  %s: ожидалось %d, фактически %d",
+                                equipmentName, inv.getCount(), inv.getRealCount()));
+                    }
+                } else {
+                    discrepancies.add(String.format("  %s: не проверено", equipmentName));
+                }
+            }
         }
 
         return InventarizationReportRs.builder()
                 .zoneId(null)
                 .discrepancies(discrepancies)
-                .totalScanned(equipmentList.size())
+                .totalScanned(totalScanned)
                 .date(LocalDate.now())
                 .build();
-    }
-
-    public String generateDiscrepancyReport(Long zoneId) {
-        return "Discrepancy report for zone " + zoneId;
     }
 
     private InventarizationRs mapToRs(Inventarization entity) {
@@ -188,124 +187,53 @@ public class InventarizationService {
                 .build();
     }
 
-    public byte[] exportInventarizationReport(Long zoneId, String format) {
-        List<Inventarization> records = inventarizationRepository.findAll().stream()
-                .filter(inv -> inv.getRealCount() != null)
-                .filter(inv -> !inv.getCount().equals(inv.getRealCount()))
-                .toList();
+    @Transactional(readOnly = true)
+    public List<InventarizationReportRs> getAllInventarizationHistory() {
+        // Получаем все завершённые инвентаризации, сгруппированные по дате/зоне
+        List<Inventarization> allInventarizations = inventarizationRepository.findAll();
 
-        if ("pdf".equalsIgnoreCase(format)) {
-            return exportInventarizationToPdf(records, zoneId);
-        } else if ("excel".equalsIgnoreCase(format)) {
-            return exportInventarizationToExcel(records, zoneId);
+        if (allInventarizations.isEmpty()) {
+            return new ArrayList<>();
         }
-        return new byte[0];
-    }
 
-    private byte[] exportInventarizationToPdf(List<Inventarization> discrepancies, Long zoneId) {
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            Document document = new Document();
-            PdfWriter.getInstance(document, out);
-            document.open();
+        // Группируем по зоне и дате (каждая инвентаризация - это отдельный отчёт)
+        Map<String, List<Inventarization>> groupedBySession = allInventarizations.stream()
+                .collect(Collectors.groupingBy(inv -> inv.getZoneId() + "_" + inv.getDate()));
 
-            // Используем FontFactory для шрифтов (нет конфликта)
-            com.itextpdf.text.Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
-            Paragraph title = new Paragraph("Отчёт о расхождениях по инвентаризации", titleFont);
-            title.setAlignment(Element.ALIGN_CENTER);
-            document.add(title);
+        List<InventarizationReportRs> history = new ArrayList<>();
 
-            Paragraph zoneInfo = new Paragraph("Зона ID: " + (zoneId == null ? "Все зоны" : zoneId));
-            zoneInfo.setAlignment(Element.ALIGN_CENTER);
-            document.add(zoneInfo);
-            document.add(Chunk.NEWLINE);
+        for (Map.Entry<String, List<Inventarization>> entry : groupedBySession.entrySet()) {
+            List<Inventarization> sessionInvs = entry.getValue();
+            Long zoneId = sessionInvs.get(0).getZoneId();
+            LocalDate date = sessionInvs.get(0).getDate();
 
-            if (discrepancies.isEmpty()) {
-                Paragraph noDiscrepancies = new Paragraph("Расхождений не обнаружено");
-                noDiscrepancies.setAlignment(Element.ALIGN_CENTER);
-                document.add(noDiscrepancies);
-            } else {
-                PdfPTable table = new PdfPTable(4);
-                table.setWidthPercentage(100);
+            List<String> discrepancies = new ArrayList<>();
+            int totalScanned = 0;
 
-                String[] headers = {"Инв. номер", "Ожидалось", "Фактически", "Расхождение"};
-                com.itextpdf.text.Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
-                for (String header : headers) {
-                    PdfPCell cell = new PdfPCell(new Phrase(header, headerFont));
-                    cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-                    table.addCell(cell);
+            for (Inventarization inv : sessionInvs) {
+                Equipment eq = equipmentRepository.findById(inv.getEquipmentInventoryNumber()).orElse(null);
+                String equipmentName = eq != null ? eq.getName() : "Оборудование №" + inv.getEquipmentInventoryNumber();
+
+                if (inv.getRealCount() != null) {
+                    totalScanned++;
+                    if (!inv.getCount().equals(inv.getRealCount())) {
+                        discrepancies.add(String.format("%s: ожидалось %d, фактически %d",
+                                equipmentName, inv.getCount(), inv.getRealCount()));
+                    }
                 }
-
-                com.itextpdf.text.Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 10);
-                for (Inventarization inv : discrepancies) {
-                    int diff = inv.getCount() - inv.getRealCount();
-
-                    PdfPCell cell1 = new PdfPCell(new Phrase(String.valueOf(inv.getEquipmentInventoryNumber()), normalFont));
-                    PdfPCell cell2 = new PdfPCell(new Phrase(String.valueOf(inv.getCount()), normalFont));
-                    PdfPCell cell3 = new PdfPCell(new Phrase(String.valueOf(inv.getRealCount()), normalFont));
-                    PdfPCell cell4 = new PdfPCell(new Phrase(String.valueOf(diff), normalFont));
-
-                    cell1.setHorizontalAlignment(Element.ALIGN_CENTER);
-                    cell2.setHorizontalAlignment(Element.ALIGN_CENTER);
-                    cell3.setHorizontalAlignment(Element.ALIGN_CENTER);
-                    cell4.setHorizontalAlignment(Element.ALIGN_CENTER);
-
-                    table.addCell(cell1);
-                    table.addCell(cell2);
-                    table.addCell(cell3);
-                    table.addCell(cell4);
-                }
-
-                document.add(table);
             }
 
-            document.close();
-            return out.toByteArray();
-
-        } catch (Exception e) {
-            throw new RuntimeException("PDF generation failed: " + e.getMessage(), e);
+            history.add(InventarizationReportRs.builder()
+                    .zoneId(zoneId)
+                    .discrepancies(discrepancies)
+                    .totalScanned(totalScanned)
+                    .date(date)
+                    .build());
         }
-    }
 
-    private byte[] exportInventarizationToExcel(List<Inventarization> discrepancies, Long zoneId) {
-        try (Workbook workbook = new XSSFWorkbook();
-             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+        // Сортируем по дате (сначала новые)
+        history.sort((a, b) -> b.getDate().compareTo(a.getDate()));
 
-            Sheet sheet = workbook.createSheet("Отчёт о расхождениях");
-
-            Row headerRow = sheet.createRow(0);
-            String[] headers = {"Инв. номер", "Ожидалось", "Фактически", "Расхождение"};
-
-            // Используем полное имя для org.apache.poi.ss.usermodel.Font
-            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
-
-            CellStyle headerStyle = workbook.createCellStyle();
-            headerStyle.setFont(headerFont);
-
-            for (int i = 0; i < headers.length; i++) {
-                Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
-                cell.setCellStyle(headerStyle);
-            }
-
-            int rowNum = 1;
-            for (Inventarization inv : discrepancies) {
-                Row row = sheet.createRow(rowNum++);
-                row.createCell(0).setCellValue(inv.getEquipmentInventoryNumber());
-                row.createCell(1).setCellValue(inv.getCount());
-                row.createCell(2).setCellValue(inv.getRealCount());
-                row.createCell(3).setCellValue(inv.getCount() - inv.getRealCount());
-            }
-
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
-
-            workbook.write(out);
-            return out.toByteArray();
-
-        } catch (Exception e) {
-            throw new RuntimeException("Excel generation failed: " + e.getMessage(), e);
-        }
+        return history;
     }
 }

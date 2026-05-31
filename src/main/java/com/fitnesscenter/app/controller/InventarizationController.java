@@ -1,6 +1,5 @@
 package com.fitnesscenter.app.controller;
 
-
 import com.fitnesscenter.app.dto.response.InventarizationRs;
 import com.fitnesscenter.app.dto.response.InventarizationReportRs;
 import com.fitnesscenter.app.dto.response.InventarizationAllRs;
@@ -9,8 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 
 @RestController
 @RequestMapping("/api/inventarization")
@@ -45,19 +42,8 @@ public class InventarizationController {
         return ResponseEntity.ok(inventarizationService.finishInventarization());
     }
 
-    @GetMapping("/export")
-    public ResponseEntity<byte[]> exportReport(
-            @RequestParam(required = false) Long zoneId,
-            @RequestParam String format) {
-
-        byte[] report = inventarizationService.exportInventarizationReport(zoneId, format);
-
-        String contentType = "application/pdf".equals(format) ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        String extension = "pdf".equals(format) ? "pdf" : "xlsx";
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=inventarization_report." + extension)
-                .body(report);
+    @GetMapping("/history")
+    public ResponseEntity<List<InventarizationReportRs>> getHistory() {
+        return ResponseEntity.ok(inventarizationService.getAllInventarizationHistory());
     }
 }

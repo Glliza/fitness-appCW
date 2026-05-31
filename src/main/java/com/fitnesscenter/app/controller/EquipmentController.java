@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/equipment")
@@ -20,6 +21,16 @@ public class EquipmentController {
     @GetMapping("/{id}")
     public ResponseEntity<EquipmentRs> get(@PathVariable Long id) {
         return ResponseEntity.ok(equipmentService.getEquipmentById(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<EquipmentRs> create(@Valid @RequestBody EquipmentRq request) {
+        return ResponseEntity.ok(equipmentService.createEquipment(request));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<EquipmentRs> update(@PathVariable Long id, @Valid @RequestBody EquipmentRq request) {
+        return ResponseEntity.ok(equipmentService.updateEquipment(id, request));
     }
 
     // Новый метод с пагинацией и фильтрацией
@@ -50,10 +61,6 @@ public class EquipmentController {
         return ResponseEntity.ok(result);
     }
 
-    @PostMapping
-    public ResponseEntity<EquipmentRs> create(@RequestBody EquipmentRq request) {
-        return ResponseEntity.ok(equipmentService.createEquipment(request));
-    }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
@@ -66,8 +73,4 @@ public class EquipmentController {
         return ResponseEntity.ok(equipmentService.changeStatus(id, status));
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<EquipmentRs> update(@PathVariable Long id, @RequestBody EquipmentRq request) {
-        return ResponseEntity.ok(equipmentService.updateEquipment(id, request));
-    }
 }

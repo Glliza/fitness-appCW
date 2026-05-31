@@ -7,6 +7,7 @@ import com.fitnesscenter.app.dto.response.RequestRepairRs;
 import com.fitnesscenter.app.dto.response.EquipmentHistoryRs;
 import com.fitnesscenter.app.service.NotificationService;
 import com.fitnesscenter.app.service.TORepairService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -30,7 +31,6 @@ public class TORepairController {
         return ResponseEntity.ok(notificationService.getUnreadNotifications(adminId));
     }
 
-    // GET для получения всех ТО с пагинацией
     @GetMapping("/to")
     public ResponseEntity<Page<TORepairRs>> getAllTO(
             @RequestParam(defaultValue = "0") int page,
@@ -44,7 +44,7 @@ public class TORepairController {
     }
 
     @PostMapping("/to")
-    public ResponseEntity<TORepairRs> createTO(@RequestBody TORepairRq request) {
+    public ResponseEntity<TORepairRs> createTO(@Valid @RequestBody TORepairRq request) {
         return ResponseEntity.ok(toRepairService.createTO(request));
     }
 
@@ -54,7 +54,7 @@ public class TORepairController {
     }
 
     @PostMapping("/repairs")
-    public ResponseEntity<RequestRepairRs> registerRepair(@RequestBody RequestRepairRq request) {
+    public ResponseEntity<RequestRepairRs> registerRepair(@Valid @RequestBody RequestRepairRq request) {
         return ResponseEntity.ok(toRepairService.registerRepairRequest(request));
     }
 

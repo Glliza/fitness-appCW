@@ -4,6 +4,7 @@ import com.fitnesscenter.app.dto.request.ZoneRq;
 import com.fitnesscenter.app.dto.response.ZoneRs;
 import com.fitnesscenter.app.dto.response.ConsumablesZonesRs;
 import com.fitnesscenter.app.service.ZoneService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,6 +25,16 @@ public class ZoneController {
         return ResponseEntity.ok(zoneService.getZoneById(id));
     }
 
+    @PostMapping
+    public ResponseEntity<ZoneRs> create(@Valid @RequestBody ZoneRq request) {
+        return ResponseEntity.ok(zoneService.createZone(request));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ZoneRs> update(@PathVariable Long id, @Valid @RequestBody ZoneRq request) {
+        return ResponseEntity.ok(zoneService.updateZone(request, id));
+    }
+
     // Новый метод с пагинацией
     @GetMapping
     public ResponseEntity<Page<ZoneRs>> getAll(
@@ -37,15 +48,6 @@ public class ZoneController {
         return ResponseEntity.ok(zoneService.getAllZones(pageable));
     }
 
-    @PostMapping
-    public ResponseEntity<ZoneRs> create(@RequestBody ZoneRq request) {
-        return ResponseEntity.ok(zoneService.createZone(request));
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<ZoneRs> update(@PathVariable Long id, @RequestBody ZoneRq request) {
-        return ResponseEntity.ok(zoneService.updateZone(request, id));
-    }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

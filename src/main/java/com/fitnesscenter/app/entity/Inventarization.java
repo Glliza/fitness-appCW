@@ -10,12 +10,9 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "inventarization")
 public class Inventarization extends BaseEntity {
-
     private Long equipmentInventoryNumber;
-
+    private Long zoneId;
     private Integer count;
-
     private Integer realCount;
-
-    private LocalDate date;  // это поле НЕ в BaseEntity, оставляем
+    private LocalDate date;
 }
