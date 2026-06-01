@@ -5,6 +5,10 @@ import com.fitnesscenter.app.dto.response.InventarizationReportRs;
 import com.fitnesscenter.app.dto.response.InventarizationAllRs;
 import com.fitnesscenter.app.service.InventarizationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -22,7 +26,7 @@ public class InventarizationController {
 
     @PostMapping("/start-all")
     public ResponseEntity<List<InventarizationAllRs>> startAll() {
-        return ResponseEntity.ok(inventarizationService.startInventarization());
+        return ResponseEntity.ok(inventarizationService.startInventarizationAll());
     }
 
     @PostMapping("/step")
@@ -39,11 +43,15 @@ public class InventarizationController {
 
     @PostMapping("/finish-all")
     public ResponseEntity<InventarizationReportRs> finishAll() {
-        return ResponseEntity.ok(inventarizationService.finishInventarization());
+        return ResponseEntity.ok(inventarizationService.finishInventarizationAll());
     }
 
     @GetMapping("/history")
-    public ResponseEntity<List<InventarizationReportRs>> getHistory() {
-        return ResponseEntity.ok(inventarizationService.getAllInventarizationHistory());
+    public ResponseEntity<Page<InventarizationReportRs>> getHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending());
+        return ResponseEntity.ok(inventarizationService.getAllInventarizationHistory(pageable));
     }
 }
