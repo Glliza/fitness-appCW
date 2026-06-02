@@ -3,6 +3,7 @@ package com.fitnesscenter.app.service;
 import com.fitnesscenter.app.dto.request.EquipmentRq;
 import com.fitnesscenter.app.dto.response.EquipmentRs;
 import com.fitnesscenter.app.entity.Equipment;
+import com.fitnesscenter.app.entity.TORepair;
 import com.fitnesscenter.app.entity.Zone;
 import com.fitnesscenter.app.exception.EntityNotFoundException;
 import com.fitnesscenter.app.repository.*;
@@ -11,6 +12,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,6 +25,7 @@ public class EquipmentService {
     private final EquipmentHistoryRepository equipmentHistoryRepository;
     private final InventarizationRepository inventarizationRepository;
     private final RequestRepairRepository requestRepairRepository;
+    private final TORepairRepository toRepairRepository;
 
     public EquipmentRs getEquipmentById(Long id) {
         Equipment equipment = equipmentRepository.findByIdAndDeletedFalse(id)
@@ -79,7 +83,35 @@ public class EquipmentService {
 
         Equipment saved = equipmentRepository.save(equipment);
         System.out.println("Сохранённое оборудование - ID: " + saved.getId());
+
+        createInitialMaintenance(saved);
+
         return mapToRs(saved);
+    }
+
+    private void createInitialMaintenance(Equipment equipment) {
+        LocalDate plannedDate;
+
+        // Если дата покупки указана, используем её + 90 дней
+        if (equipment.getDataBuy() != null) {
+            plannedDate = equipment.getDataBuy().plusDays(90);
+        } else {
+            // Если даты покупки нет, используем текущую дату + 90 дней
+            plannedDate = LocalDate.now().plusDays(90);
+        }
+
+        TORepair toRepair = new TORepair();
+        toRepair.setEquipmentId(equipment.getId());
+        toRepair.setType("Диагностика");
+        toRepair.setPlannedDate(plannedDate);
+        toRepair.setDescription("Автоматически созданное ТО при добавлении оборудования");
+        toRepair.setStatus("Запланировано");
+        toRepair.setWorker("Система");
+
+        toRepairRepository.save(toRepair);
+
+        System.out.println("Автоматически создано ТО для оборудования ID: " + equipment.getId() +
+                " на дату: " + plannedDate);
     }
 
     @Transactional
