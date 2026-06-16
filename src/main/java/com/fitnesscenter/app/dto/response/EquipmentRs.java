@@ -8,7 +8,7 @@ import java.time.LocalDate;
 @Builder
 public class EquipmentRs {
     private Long id;
-    private Long zoneId;        // ДОБАВЬТЕ ЭТО ПОЛЕ
+    private Long zoneId;
     private String zoneName;
     private String name;
     private String status;

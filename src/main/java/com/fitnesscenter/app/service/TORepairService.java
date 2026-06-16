@@ -29,7 +29,7 @@ public class TORepairService {
     private final EquipmentRepository equipmentRepository;
     private final AdministratorRepository administratorRepository;
 
-    // ========== МЕТОДЫ ДЛЯ ТО ==========
+
 
     public Page<TORepairRs> getAllTO(Pageable pageable) {
         return toRepairRepository.findAll(pageable)
@@ -84,6 +84,10 @@ public class TORepairService {
         toRepair.setStatus("Выполнена");
         toRepair.setCompletedDate(LocalDate.now());
         TORepair saved = toRepairRepository.save(toRepair);
+
+        System.out.println("=== ВЫПОЛНЕНИЕ ТО ===");
+        System.out.println("ID: " + saved.getId());
+        System.out.println("Новый статус: " + saved.getStatus());
 
         List<TORepair> existingPlanned = toRepairRepository
                 .findByEquipmentIdAndStatus(saved.getEquipmentId(), "Запланировано");
@@ -242,5 +246,21 @@ public class TORepairService {
                 .description(entity.getDescription())
                 .creator(entity.getCreator())
                 .build();
+    }
+
+    @Transactional
+    public void fixOldTOStatuses() {
+        List<TORepair> allTO = toRepairRepository.findAll();
+        for (TORepair to : allTO) {
+            if (to.getStatus() == null) {
+                // Если есть completedDate - значит ТО выполнено
+                if (to.getCompletedDate() != null) {
+                    to.setStatus("Выполнена");
+                } else {
+                    to.setStatus("Запланировано");
+                }
+                toRepairRepository.save(to);
+            }
+        }
     }
 }

@@ -17,7 +17,6 @@ public class Inventarization extends BaseEntity {
     private Integer realCount;
     private LocalDate date;
 
-    // Добавляем поле для группировки в одну сессию
     @Column(name = "session_id")
     private String sessionId;
 }

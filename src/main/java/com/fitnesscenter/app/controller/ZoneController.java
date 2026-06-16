@@ -35,7 +35,6 @@ public class ZoneController {
         return ResponseEntity.ok(zoneService.updateZone(request, id));
     }
 
-    // Новый метод с пагинацией
     @GetMapping
     public ResponseEntity<Page<ZoneRs>> getAll(
             @RequestParam(defaultValue = "0") int page,

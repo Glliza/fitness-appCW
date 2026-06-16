@@ -13,7 +13,6 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // Обработчик валидации DTO
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ValidationErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
@@ -55,7 +54,6 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(ex.getMessage(), LocalDateTime.now()));
     }
 
-    // Класс для детальных ошибок валидации
     public static class ValidationErrorResponse {
         private String message;
         private Map<String, String> errors;

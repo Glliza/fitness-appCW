@@ -15,7 +15,7 @@ public class EquipmentHistory extends BaseEntity {
 
     private String type;
 
-    private LocalDate date;  // это поле НЕ в BaseEntity, оставляем
+    private LocalDate date;
 
     private String worker;
 

@@ -38,7 +38,6 @@ public class AuthService {
     }
 
     public void logout(String token) {
-        // логика выхода
     }
 
     public String hashPassword(String rawPassword) {

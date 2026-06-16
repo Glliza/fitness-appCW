@@ -52,13 +52,13 @@ public class ConsumablesService {
         return mapToRs(consumables);
     }
 
-    // Новый метод с пагинацией
+
     public Page<ConsumablesRs> getAllConsumables(Pageable pageable) {
         return consumablesRepository.findAll(pageable)
                 .map(this::mapToRs);
     }
 
-    // Старый метод для совместимости
+
     public List<ConsumablesRs> getAllConsumablesList() {
         return consumablesRepository.findAll().stream()
                 .map(this::mapToRs)
@@ -111,7 +111,7 @@ public class ConsumablesService {
                 .orElse(0);
     }
 
-    // Метод для получения балансов по всем зонам для таблицы (с пагинацией по зонам)
+
     public Page<ZoneBalanceDto> getZoneBalances(Pageable pageable) {
         Page<Zone> zonesPage = zoneRepository.findAllByDeletedFalse(pageable);
         return zonesPage.map(zone -> {
@@ -150,7 +150,6 @@ public class ConsumablesService {
         return new byte[0];
     }
 
-    // Вспомогательный DTO для балансов
     public static class ZoneBalanceDto {
         private Long zoneId;
         private String zoneName;

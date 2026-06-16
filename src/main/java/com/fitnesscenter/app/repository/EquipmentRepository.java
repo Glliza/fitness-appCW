@@ -17,7 +17,6 @@ public interface EquipmentRepository extends JpaRepository<Equipment, Long> {
     List<Equipment> findByStatusAndDeletedFalse(String status);
     Integer countByZoneIdAndDeletedFalse(Long zoneId);
 
-    // Методы для фильтрации с пагинацией
     Page<Equipment> findByZoneIdAndDeletedFalse(Long zoneId, Pageable pageable);
     Page<Equipment> findByStatusAndDeletedFalse(String status, Pageable pageable);
     Page<Equipment> findByZoneIdAndStatusAndDeletedFalse(Long zoneId, String status, Pageable pageable);
